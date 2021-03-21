@@ -15,7 +15,7 @@ import torch
 #     2.  Related to goal selection: goal_idx, dist_eps, ol_alg, eta, normalize_cost
 #     3.  Related to initialization: ik_seed_num, goal_set_max_num, remove_flip_grasp, ik_parallel, ik_clearance
 #     4.  Related to optimizations: optim_steps, collision_point_num, timesteps, base_step_size, cost_schedule_boost
-#     5.  Others: base_obstacle_weight, smooth_base_weight, use_standoff, dynamic_timestep, pre_terminate, standoff_dist, traj_delta
+#     5.  Others: base_obstacle_weight, smooth_base_weight, use_standoff, dynamic_timestep, pre_terminate, standoff_dist, trajectory_delta
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 cfg = edict()
@@ -37,13 +37,13 @@ cfg.epsilon = 0.2  # the obstacle padding distance that has gradient
 cfg.target_epsilon = 0.03  # the obstacle padding distance for target object
 cfg.target_obj_collision = 0.0  # 0.0 scale factor for target object collision
 cfg.collision_point_num = 15  # collision point sample number for each link
-cfg.time_interval = 0.1  # time inverval for computing velocity
+cfg.time_interval = 0.1  # time interval for computing velocity
 cfg.top_k_collision = 1000  # the number of closest point to penalize for each trajectory
 cfg.link_collision_weight = np.ones([10, 1])  # link collision weight depending on size
 cfg.link_smooth_weight = np.ones(9) # link smooth weight depending on size
 
-cfg.clearance = 0.01  # clerance threshold for determining if a traj has collision
-cfg.ik_clearance = 0.03  # clerance threshold for determining if an ik has collision
+cfg.clearance = 0.01  # clearance threshold for determining if a trajectory has collision
+cfg.ik_clearance = 0.03  # clearance threshold for determining if an ik has collision
 cfg.target_size = 1.0  # target object's actual sdf resize ratio
 cfg.obstacle_size = 1  # obstacle's resize ratio
 cfg.obj_point_num = 800  # object points for KDTree in isf
@@ -52,8 +52,8 @@ cfg.terminate_grad_norm = 1.5  # terminate condition for smooth grad norm
 cfg.terminate_smooth_loss = 35  # terminate condition for trajectory
 cfg.penalize_constant = 5  # scaling negative sdf values to avoid collision
 cfg.grasp_optimize = False  # the option of optimizing grasp term
-cfg.traj_init = "grasp"  # use ik or precomputed grasp list to initialize the goal
-cfg.traj_interpolate = "cubic"  # interpolate trajectory waypoints between start and end
+cfg.trajectory_init = "grasp"  # use ik or precomputed grasp list to initialize the goal
+cfg.trajectory_interpolate = "cubic"  # interpolate trajectory waypoints between start and end
  
 cfg.goal_set_proj = False  # use the goal set variant of CHOMP
 cfg.goal_set_max_num = 100  # the maximum number of goals in the goal set
@@ -84,10 +84,10 @@ cfg.reach_tail_length = 5  # the trajectory length for standoff reaching
 cfg.use_layer = True  # use sdf layer or torch cuda for collision check
 cfg.increment_iks = False  # for more goals during solving iks
 cfg.ik_parallel = True  # for more goals during solving iks
-cfg.traj_delta = 0.05  # resolution for trajectory state discretization
+cfg.trajectory_delta = 0.05  # resolution for trajectory state discretization
 cfg.colored_gripper = False  # use colored robot model
-cfg.traj_max_step = 50  # maximum step
-cfg.traj_min_step = 2  # minimum step
+cfg.trajectory_max_step = 50  # maximum step
+cfg.trajectory_min_step = 2  # minimum step
 cfg.default_lazy = True # lazy grasp computation
 cfg.y_upsample = False # upsampling grasps around the antipodal contacts
 
