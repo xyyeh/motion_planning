@@ -1,0 +1,1 @@
+1. self.cfg.goal_set_proj is false

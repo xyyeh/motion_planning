@@ -1,0 +1,17 @@
+numpy
+scipy
+matplotlib
+transforms3d
+pillow
+IPython
+matplotlib
+easydict
+pyyaml 
+cmake
+future
+pyassimp
+pyopengl
+opencv-python
+torchvision
+torch
+lxml
