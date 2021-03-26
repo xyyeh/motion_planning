@@ -1,79 +1,20 @@
-from util import *
-import config
-
 import numpy as np
 import eigen as e
-import sva as s
 import rbdyn as rbd
-
+import sva as s
 from rbdyn.parsers import *
 
+import pybullet as b
+import pybullet_data
+
 import time
-import torch
 
-torch.no_grad()
-
-class Trajectory(object):
-    """
-    Trajectory class
-    """
-    def __init__(self, timesteps=100, dof=7):
-        """
-        Initialize fixed endpoint trajectory.
-        """
-        self.timesteps = config.cfg.timesteps
-        self.dof = dof
-        self.goal_set = []
-        self.goal_quality = []
-
-        # organize joint space trajectories as q_init^T, [q1^T; q2^T; ...] , q_goal^T
-        self.start = np.array([0.0, -1.285, 0, -2.356, 0.0, 1.571, 0.785])
-        self.data = np.zeros([self.timesteps, dof])
-        self.end = np.array([-0.99, -1.74, -0.61, -3.04, 0.88, 1.21, -1.12])
-
-        self.interpolate_waypoints(mode=config.cfg.trajectory_interpolate)
-
-    def update(self, grad):
-        """
-        Update trajectory based on functional gradient.
-        """
-        if config.cfg.consider_finger:  # TODO: set to false
-            self.data += grad
-        else:
-            self.data[:, :-2] += grad[:, :-2]
-        self.data[:, -2:] = np.minimum(np.maximum(self.data[:, -2:], 0), 0.04)
-
-    def set(self, new_trajectory):
-        """
-        Set trajectory by given data.
-        """
-        self.data = new_trajectory
-
-    def interpolate_waypoints(self, waypoints=None, mode="cubic"):
-        """
-        Interpolate the waypoints using interpolation.
-        """
-        timesteps = config.cfg.timesteps
-        if config.cfg.dynamic_timestep:
-            timesteps = min(
-                max(
-                    int(np.linalg.norm(self.start - self.end) / config.cfg.trajectory_delta),
-                    config.cfg.trajectory_min_step,
-                ),
-                config.cfg.trajectory_max_step,
-            )
-            config.cfg.timesteps = timesteps
-            self.data = np.zeros([timesteps, self.dof])  # fixed start and end
-            config.cfg.get_global_param(timesteps)
-            self.timesteps = timesteps
-        self.data = interpolate_waypoints(
-            np.stack([self.start, self.end]), timesteps, self.start.shape[0], mode=mode
-        )
 
 class Robot(object):
     """
-    Robot kinematics and dynamics class
+    Robot class
     """
+
     def __init__(self, urdf_path):
         self.urdf_path = urdf_path
         self.kine_dyn = from_urdf_file(self.urdf_path)
@@ -99,13 +40,6 @@ class Robot(object):
         for i, (k, v) in enumerate(self.kine_dyn.limits.upper.items()):
             self.upper_limit[i] = v
 
-        # # setup spheres for collision detection
-        # self.extents = np.loadtxt(config.cfg.robot_model_path + "/extents.txt")
-        # self.sphere_size = (
-        #     np.linalg.norm(self.extents, axis=-1).reshape([self.extents.shape[0], 1])
-        #     / 2.0
-        # )
-        
     def set_id(self, id):
         self.id = id
 
@@ -118,6 +52,13 @@ class Robot(object):
         @param q A list of joint angles
         @param dq A list of joint velocities
         """
+        # self.kine_dyn.mbc.q = []
+        # self.kine_dyn.mbc.alpha = []
+        # self.kine_dyn.mbc.q.append([])
+        # self.kine_dyn.mbc.alpha.append([])
+        # for i in range(len(q)):
+        #     self.kine_dyn.mbc.q.append([q[i]])
+        #     self.kine_dyn.mbc.alpha.append([dq[i]])
         self.kine_dyn.mbc.q = [
             [],
             [q[0]],
@@ -138,6 +79,7 @@ class Robot(object):
             [dq[5]],
             [dq[6]],
         ]
+
         # forward kinematics
         rbd.forwardKinematics(p.mb, p.mbc)
         rbd.forwardVelocity(p.mb, p.mbc)
@@ -155,7 +97,7 @@ class Robot(object):
         # nonlinear effects vector
         fd.computeC(p.mb, p.mbc)
         self.h = fd.C()
-        
+
         return M, Minv, h
 
     def _body_id_from_name(name, bodies):
@@ -168,7 +110,6 @@ class Robot(object):
         for bi, b in enumerate(bodies):
             if b.name().decode("utf-8") == name:
                 return bi
-                
         return -1
 
     def _sva_to_affine(sTransform):
@@ -180,6 +121,7 @@ class Robot(object):
         m4d = e.Matrix4d.Identity()
         R = sTransform.rotation().transpose()
         p = sTransform.translation()
+
         for row in range(3):
             for col in range(3):
                 m4d.coeff(row, col, R.coeff(row, col))
@@ -188,23 +130,75 @@ class Robot(object):
 
         return m4d
 
-class Env(object):
-    """
-    Environment class
-    """
-    def __init__(self):
-        pass
 
-class PlanningScene(object):
-    """
-    Planning scene class
-    """
-    def __init__(self, cfg):
-        self.traj = Trajectory(config.cfg.timesteps)
-        print("Setting up env...")
-        start_time = time.time()
-        
-        if len(config.cfg.scene_file) > 0:
-            self.planner = Planner(self.env, self.traj, lazy=config.cfg.default_lazy)
-            if config.cfg.vis:
-                self.setup_renderer()
+class Simulation(object):
+    def __init__(self, time_step, robot):
+        # setup physics
+        self.robot = robot
+        self.time_step = time_step
+        self.time = 0
+
+        # client
+        physics_client = b.connect(b.GUI)
+        b.setAdditionalSearchPath(pybullet_data.getDataPath())
+        b.setGravity(0, 0, -9.81)
+        b.setRealTimeSimulation(0)
+        b.setTimeStep(time_step)
+
+        # import robot
+        planeId = b.loadURDF("plane.urdf")
+        startPos = [0, 0, 0]
+        startOrientation = b.getQuaternionFromEuler([0, 0, 0])
+        loadFlag = (
+            b.URDF_USE_INERTIA_FROM_FILE | b.URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS
+        )
+        robotId = b.loadURDF(
+            self.robot.urdf_path, startPos, startOrientation, flags=loadFlag
+        )
+        self.robot.set_id(robotId)
+
+        # unlock joints
+        nDof = b.getNumJoints(self.robot.id)
+        b.setJointMotorControlArray(
+            robotId,
+            range(nDof),
+            b.VELOCITY_CONTROL,
+            forces=[0] * nDof,
+        )
+
+    def get_time(self):
+        return self.time
+
+    def step_simulation(self):
+        b.stepSimulation()
+        self.time += self.time_step
+        time.sleep(self.time_step)
+
+    def set_robot_cfg(self, q):
+        for i in range(b.getNumJoints(self.robot.id)):
+            b.resetJointState(self.robot.get_id(), i, targetValue=q[i])
+
+    def _update_simulation(self):
+        joints_id = range(self.robot.dof)
+        joint_states = b.getJointStates(self.robot.id, joints_id)
+        # read state feedback
+        q = [joint_states[i][0] for i in joints_id]
+        dq = [joint_states[i][1] for i in joints_id]
+        # update kinematics and dynamics properties
+        self.robot.update_kinematics(q, dq)
+        self.robot.update_dynamics()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    step_time = 0.001
+    total_time = 10
+
+    robot = Robot("./assets/kuka_iiwa.urdf")
+    sim = Simulation(step_time, robot)
+
+    while sim.get_time() < total_time:
+        sim.step_simulation()
+
+    # s = Simulation(0.001, r)

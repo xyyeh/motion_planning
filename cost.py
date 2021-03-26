@@ -12,9 +12,6 @@ class Cost(object):
     def __init__(self, env):
         self.env = env
         self.cfg = env.config
-        self.sdf_loss = SDFLoss()
-        if len(self.env.objects) > 0:
-            self.target_obj = self.env.objects[self.env.target_idx]
 
     def functional_grad(self, v, a, JT, ws_cost, ws_grad):
         """
