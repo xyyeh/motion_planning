@@ -6,10 +6,10 @@ class Optimizer(object):
     Optimizer class that runs optimization based on CHOMP
     """
 
-    def __init__(self, scene, cost):
-        self.cfg = scene.config
-        self.joint_lower_limit = scene.robot.joint_lower_limit
-        self.joint_upper_limit = scene.robot.joint_upper_limit
+    def __init__(self, env, cost):
+        self.cfg = env.config
+        self.lower_limit = env.robot.lower_limit
+        self.upper_limit = env.robot.upper_limit
         self.cost = cost
         self.step = 0
         self.time = 0.0
@@ -19,7 +19,6 @@ class Optimizer(object):
         """
         Record and print information for debug purpose
         """
-
         text = []
         if self.cfg.report_cost:
             text = [
@@ -53,20 +52,18 @@ class Optimizer(object):
 
     def update(self):
         """
-        Update the state of the optimizer
+        Update the time, weight and step size of the optimizer.
         """
+        # time
         self.step += 1
         self.time_elapsed = time.time() - self.time
         self.time = time.time()
 
-        # cost schedule
-        # obstacle weight
-
-        # smoothness weight
+        # cost scheduling
+        # obstacle, smoothness and grasp weights
         self.cfg.smoothness_weight = (
             self.cfg.smoothness_base_weight * self.cfg.cost_schedule_boost ** self.step
         )
-
         # grasp weight
 
         # step size
@@ -110,25 +107,32 @@ class Optimizer(object):
 
     def optimize(self, trajectory, force_update=False, info_only=False):
         """
-        Run one step of chomp optimization, using update rule in (3) (after solving the arg min) of DOI 10.1109/robot.2009.5152817
+        Run one step of chomp optimization, using update rule in (19) (after solving the arg min) of DOI 10.1177/0278364913488805
         """
+        # update time, weights and step size
         self.update()
         curve = trajectory.data
+
+        # compute losses
         cost, grad, info = self.cost.compute_total_loss(trajectory)
         self.check_joint_limit(curve, info)
+
+        # setup report
         info["text"] = self.report(curve, info)
         if (info["terminate"] and not force_update) or info_only:
             return info
 
+        # using goal set projection
         if self.cfg.goal_set_proj:
             print("Not implemented")
             # update = self.goal_set_projection(trajectory, grad)
-            # trajectory.update(update)
-            # trajectory.set(self.handle_joint_limit(trajectory.data))
         else:
             update = -self.cfg.step_size * self.cfg.Ainv.dot(grad)
-            trajectory.update(update)
-            trajectory.set(self.handle_joint_limit(trajectory.data))
+
+        # update trajectory
+        trajectory.update(update)
+        trajectory.set(self.handle_joint_limit(trajectory.data))
+        
         return info
         
     def handle_joint_limit(self, curve):

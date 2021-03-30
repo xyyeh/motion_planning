@@ -174,7 +174,12 @@ class Simulation(object):
         self.time += self.time_step
         time.sleep(self.time_step)
 
-    def set_robot_cfg(self, q):
+    def step_simulation(self, q):
+        self._set_robot_cfg(q)
+        self.time += self.time_step
+        time.sleep(self.time_step)
+
+    def _set_robot_cfg(self, q):
         for i in range(b.getNumJoints(self.robot.id)):
             b.resetJointState(self.robot.get_id(), i, targetValue=q[i])
 
@@ -198,7 +203,10 @@ if __name__ == "__main__":
     robot = Robot("./assets/kuka_iiwa.urdf")
     sim = Simulation(step_time, robot)
 
+    q = np.random.rand(7)
+
     while sim.get_time() < total_time:
-        sim.step_simulation()
+        # sim.step_simulation()
+        sim.step_simulation(q)
 
     # s = Simulation(0.001, r)
