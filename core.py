@@ -1,6 +1,5 @@
 from util import *
-import config
-
+from config import *
 from planner import Planner
 
 import numpy as np
@@ -15,6 +14,8 @@ import pybullet_data
 import time
 import torch
 
+import matplotlib.pyplot as plt
+
 torch.no_grad()
 
 class Trajectory(object):
@@ -26,18 +27,20 @@ class Trajectory(object):
         """
         Initialize fixed endpoint trajectory.
         """
-        self.timesteps = config.cfg.timesteps
+        self.timesteps = cfg.timesteps
         self.dof = dof
         self.goal_set = []
         self.goal_quality = []
 
         # organize joint space trajectories as q_init^T, [q_1^T; q_2^T; ...; q_nTimestep^T] , q_goal^T
+        # [2.96706  2.0944 2.96706  2.0944 2.96706  2.0944 3.05433]
+        # [-2.96706  -2.0944 -2.96706  -2.0944 -2.96706  -2.0944 -3.05433]
         self.start = np.array([0.0, -1.285, 0, -2.356, 0.0, 1.571, 0.785])
         self.data = np.zeros([self.timesteps, dof])
-        self.end = np.array([-0.99, -1.74, -0.61, -3.04, 0.88, 1.21, -1.12])
+        self.end = np.array([-0.99, 1.0, -0.61, 1.04, 0.88, 1.21, -1.12])
 
         # interpolate through the waypoints
-        self.interpolate_waypoints(mode=config.cfg.trajectory_interpolate)
+        self.interpolate_waypoints(mode=cfg.trajectory_interpolate)
 
     def update(self, grad):
         """
@@ -55,30 +58,29 @@ class Trajectory(object):
         """
         Interpolate the waypoints using interpolation with fixed/variable time steps
         """
-        timesteps = config.cfg.timesteps
+        timesteps = cfg.timesteps
 
         # check if dynamic timesteps are desired, default to false
-        if config.cfg.dynamic_timestep:
+        if cfg.dynamic_timestep:
             timesteps = min(
                 max(
                     int(
                         np.linalg.norm(self.start - self.end)
-                        / config.cfg.trajectory_delta
+                        / cfg.trajectory_delta
                     ),
-                    config.cfg.trajectory_min_step,
+                    cfg.trajectory_min_step,
                 ),
-                config.cfg.trajectory_max_step,
+                cfg.trajectory_max_step,
             )
-            config.cfg.timesteps = timesteps
+            cfg.timesteps = timesteps
             self.data = np.zeros([timesteps, self.dof])  # fixed start and end
-            config.cfg.get_global_param(timesteps)
+            cfg.get_global_param(timesteps)
             self.timesteps = timesteps
 
         # interpolate through waypoints
         self.data = interpolate_waypoints(
             np.stack([self.start, self.end]), timesteps, self.start.shape[0], mode=mode
         )
-
 
 class Simulation(object):
     def __init__(self, time_step, robot):
@@ -148,7 +150,7 @@ class Environment(object):
     """
     def __init__(self, robot, cfg):
         self.robot = robot
-        self.config = config.cfg
+        self.config = cfg
 
 class Robot(object):
     """
@@ -273,8 +275,8 @@ class PlanningScene(object):
     Planning scene containing the environment configuration, planner and trajectory.
     """
     def __init__(self, robot, cfg):
-        self.trajectory = Trajectory(config.cfg.timesteps)
-        self.env = Environment(robot, config.cfg)
+        self.trajectory = Trajectory(cfg.timesteps)
+        self.env = Environment(robot, cfg)
         self.planner = Planner(self.env, self.trajectory)
 
     def update_planner(self):
@@ -286,31 +288,54 @@ class PlanningScene(object):
         """
         self.planner = Planner(self.env, self.trajectory)
 
-    def step_scene(self):
+    def plan(self):
         """
         Run an optimization step
         """
         plan = self.planner.plan(self.trajectory)
         return plan
 
+def plot_results(trajectory, upper_limit, lower_limit):
+    """
+    Plots the joint space trajectories
+    """
+    for i in range(robot.dof):
+        plt.subplot(4,3,i+1)
+        plt.plot(np.append(np.append(trajectory.start[i], trajectory.data[:,i]),trajectory.end[i]))
+
+    plt.show()
+
 
 if __name__ == "__main__":
     import argparse
 
     step_time = 0.001
-    total_time = 10
+    total_time = 20
 
     robot = Robot("./assets/kuka_iiwa.urdf")
     sim = Simulation(step_time, robot)
 
-    q = np.random.rand(7)
+    # configurations
+    cfg.timesteps = 50
+    cfg.get_global_param(cfg.timesteps)
 
     # get ik
 
     # planning phase
-    planningScene = PlanningScene(robot, config.cfg)
+    planningScene = PlanningScene(robot, cfg)
+    planningScene.plan()
 
-    # run controller
-    while sim.get_time() < total_time:
-        # sim.step_simulation()
-        sim.step_simulation(q)
+    # load objects
+
+    # results
+    plot_results(planningScene.trajectory, robot.lower_limit, robot.upper_limit)
+
+    # # run controller
+    # # while sim.get_time() < total_time:
+    # #     # sim.step_simulation()
+    
+    i = 0
+    while i < cfg.timesteps:
+        sim.step_simulation(planningScene.trajectory.data[i,:])
+        i = i+1
+        time.sleep(0.05)

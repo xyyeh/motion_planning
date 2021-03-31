@@ -44,11 +44,11 @@ class Cost(object):
         link_smooth_weight = np.array(self.cfg.link_smooth_weight)[None]
         ed = np.zeros(
             [xi.shape[0] + 1, xi.shape[1]]
-        )  # one additional element for difference computation
+        )  # one additional element for difference computation, \mathbb{R}^{n_time_steps+1 x 1}
 
-        # first element:
+        # first element: ed \in \mathbb{R}^{n_time_steps+1 x 1}
         ed[0] = (
-            self.cfg.diff_rule[0][self.cfg.diff_rule_length // 2 - 1]
+            self.cfg.diff_rule[0][self.cfg.diff_rule_length // 2 - 1]  # -1
             * start
             / self.cfg.time_interval
         )
@@ -56,17 +56,30 @@ class Cost(object):
         # last element: if we are not using goal set, use the last trajectory point
         if not self.cfg.goal_set_proj:
             ed[-1] = (
-                self.cfg.diff_rule[0][self.cfg.diff_rule_length // 2]
+                self.cfg.diff_rule[0][self.cfg.diff_rule_length // 2]  # 1
                 * end
                 / self.cfg.time_interval
             )
 
-        # remaining velocities
+        # remaining velocities, mathbb{R}^{n_time_steps+1 x n_time_steps} x mathbb{R}^{n_time_steps}
+        # velocity \in mathbb{R}^{n_time_steps+1}
         velocity = self.cfg.diff_matrices[0].dot(xi)
 
         # equation (1) with D = 1, \frac{1}{2} w_1 (\xi^T K_1^T + e_1^T) (K_1 \xi + e_1)
-        velocity_norm = link_smooth_weight * np.linalg.norm((velocity + ed), axis=1)
-        smoothness_loss = 0.5 * velocity_norm ** 2
+        # axis = 0 gets norm of each columns
+        # axis = 1 gets norm of each rows
+        # velocity_norm = (
+        #     np.matmul(velocity.transpose(), velocity)
+        #     + np.matmul(velocity.transpose(), ed)
+        #     + np.matmul(ed.transpose(), velocity)
+        #     + np.matmul(ed.transpose(), ed)
+        # )
+        # weighted_velocity_norm =
+
+        weighted_velocity_norm = np.linalg.norm(
+            (velocity + ed) * link_smooth_weight, axis=1
+        )
+        smoothness_loss = 0.5 * weighted_velocity_norm ** 2
 
         # equation (2): diff (1) wrt \xi, w_1 (K_1^T K_1 \xi + K_1^T e_1)
         smoothness_grad = self.cfg.A.dot(xi) + self.cfg.diff_matrices[0].T.dot(ed)
@@ -82,47 +95,55 @@ class Cost(object):
         smoothness_loss, smoothness_grad = self.compute_smooth_loss(
             trajectory.data, trajectory.start, trajectory.end
         )
+        smoothness_loss_sum = smoothness_loss.sum()
 
         # obstacle loss and gradient
 
         # total cost and vectorial summation of gradient
         # cost = weighted_obs + weighted_smooth
         # grad = weighted_obs_grad + weighted_smooth_grad
+
+        # weights
+        weighted_smooth = self.cfg.smoothness_weight * smoothness_loss_sum
+        weighted_smooth_grad = self.cfg.smoothness_weight * smoothness_grad
+
+        # total costs
         cost = weighted_smooth
         grad = weighted_smooth_grad
 
-        cost_traj = self.cfg.smoothness_weight * smoothness_loss[:-1]
+        cost_trajectory = self.cfg.smoothness_weight * smoothness_loss[:-1]
 
-        goal_dist = (
-            np.linalg.norm(
-                trajectory.data[-1] - trajectory.goal_set[trajectory.goal_idx]
-            )
-            if self.cfg.goal_set_proj
-            else 0
-        )
+        if self.cfg.goal_set_proj:
+            # goal_distance = (
+            # np.linalg.norm(
+            #     trajectory.data[-1] - trajectory.goal_set[trajectory.goal_idx]
+            # )
+            print("Not implemented - compute_total_loss")
+            goal_distance = 0
+        else:
+            goal_distance = np.linalg.norm(trajectory.data[-1] - trajectory.end)
+
+        # goal_distance = (
+        #     np.linalg.norm(
+        #         trajectory.data[-1] - trajectory.goal_set[trajectory.goal_idx]
+        #     )
+        #     if self.cfg.goal_set_proj
+        #     else 0
+        # )
 
         terminate = (
             self.cfg.pre_terminate
-            and (goal_dist < 0.01)
-            and smoothness_loss_sum < self.cfg.terminate_smooth_loss
+            and (goal_distance < 0.01)
         )
 
-        execute = smoothness_loss_sum < self.cfg.terminate_smooth_loss
-
-        standoff_idx = (
-            len(trajectory.data) - self.cfg.reach_tail_length
-            if self.cfg.use_standoff
-            else len(trajectory.data) - 1
-        )
         info = {
             "smooth": smoothness_loss_sum,
             "gradient": grad,
             "cost": cost,
             "grad": np.linalg.norm(grad),
             "terminate": terminate,
-            "reach": goal_dist,
-            "execute": execute,
-            "cost_traj": cost_traj,
+            "goal_distance": goal_distance,
+            "cost_trajectory": cost_trajectory,
         }
 
         return cost, grad, info

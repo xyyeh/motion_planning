@@ -80,14 +80,12 @@ class Planner(object):
         self.info = []
         self.selected_goals = []
         start_time_ = time.time()
-        alg_switch = self.cfg.ol_alg != "Baseline" and self.cfg.ol_alg != "Proj"
 
         if (not self.cfg.goal_set_proj) or len(self.trajectory.goal_set) > 0:
             for t in range(self.cfg.optim_steps + self.cfg.extra_smooth_steps):
                 start_time = time.time()
                 if (
-                    self.cfg.goal_set_proj
-                    and alg_switch and t < self.cfg.optim_steps 
+                    self.cfg.goal_set_proj and t < self.cfg.optim_steps 
                 ):
                     self.learner.update_goal()
                     self.selected_goals.append(self.trajectory.goal_idx)
@@ -109,9 +107,9 @@ class Planner(object):
 
             plan_time = time.time() - start_time_
             res = (
-                "SUCCESS BE GENTLE"
+                "SUCCESS"
                 if self.info[-1]["terminate"]
-                else "FAIL DONT EXECUTE"
+                else "FAIL DON'T EXECUTE"
             )
             if not self.cfg.silent:
                 print(
@@ -120,7 +118,8 @@ class Planner(object):
                 )
             )
             self.info[-1]["time"] = plan_time
-
         else:
-            if not self.cfg.silent: print("planning not run...")
+            if not self.cfg.silent: 
+                print("planning not running...")
+
         return self.info

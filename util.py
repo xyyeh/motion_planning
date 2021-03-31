@@ -231,7 +231,7 @@ def unravel_index(index, shape):
     return tuple(reversed(out))
 
 
-def interpolate_waypoints(waypoints, n, m, mode="cubic"):  # linear
+def interpolate_waypoints(waypoints, n, m, mode="cubic"):
     """
     Interpolate the waypoints using interpolation.
     """
@@ -242,7 +242,7 @@ def interpolate_waypoints(waypoints, n, m, mode="cubic"):  # linear
         y = waypoints[:, i]
 
         t = np.linspace(0, 1, n + 2)
-        if mode == "linear":  # clamped cubic spline
+        if mode == "linear":  # ramp
             f = interpolate.interp1d(x, y, "linear")
         if mode == "cubic":  # clamped cubic spline
             f = interpolate.CubicSpline(x, y, bc_type="clamped")
@@ -256,7 +256,7 @@ def interpolate_waypoints(waypoints, n, m, mode="cubic"):  # linear
 
 def multi_interpolate_waypoints(
     start, goals, n, m, mode="cubic", include_endpoint=True
-):  # linear
+):
     """
     Interpolate the waypoints from one start to multiple goals using interpolation.
     """

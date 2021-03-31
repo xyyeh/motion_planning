@@ -8,8 +8,8 @@ class Optimizer(object):
 
     def __init__(self, env, cost):
         self.cfg = env.config
-        self.lower_limit = env.robot.lower_limit
-        self.upper_limit = env.robot.upper_limit
+        self.lower_limit = np.array(env.robot.lower_limit.transpose())
+        self.upper_limit = np.array(env.robot.upper_limit.transpose())
         self.cost = cost
         self.step = 0
         self.time = 0.0
@@ -28,9 +28,9 @@ class Optimizer(object):
                 ),
                 "joint limit: {:.2f}/{:.2f}, {:.2f}/{:.2f}, violate: {} reach: {:.2f} timestep {}".format(
                     curve.min(),
-                    self.joint_lower_limit.min(),
+                    self.lower_limit.min(),
                     curve.max(),
-                    self.joint_upper_limit.max(),
+                    self.upper_limit.max(),
                     info["violate_limit"],
                     info["reach"],
                     self.cfg.timesteps,
@@ -109,6 +109,8 @@ class Optimizer(object):
         """
         Run one step of chomp optimization, using update rule in (19) (after solving the arg min) of DOI 10.1177/0278364913488805
         """
+        print("Run chomp")
+
         # update time, weights and step size
         self.update()
         curve = trajectory.data
@@ -157,19 +159,21 @@ class Optimizer(object):
         """
         Compute L1 projection to the joint limit.
         """
-        low_mask = curve < self.joint_lower_limit
-        high_mask = curve > self.joint_upper_limit
-        xi_v = low_mask * (self.joint_lower_limit - curve) + high_mask * (
-            self.joint_upper_limit - curve
+        low_mask = curve < self.lower_limit
+        high_mask = curve > self.upper_limit
+        xi_v = low_mask * (self.lower_limit - curve) + high_mask * (
+            self.upper_limit - curve
         )
         return xi_v
 
     def check_joint_limit(self, curve, info):
         """
         Check joint limit violation
+        @param trajectory data \in \mathbb{R}^{n_time_steps+1}
+        @param information
         """
-        low_mask = (curve < self.joint_lower_limit - 5e-3).any()
-        high_mask = curve > self.joint_upper_limit + 5e-3
-        over_joint_limit = (low_mask * high_mask).any()  #
+        low_mask = (curve < self.lower_limit - 5e-3).any()
+        high_mask = curve > self.upper_limit + 5e-3
+        over_joint_limit = (low_mask * high_mask).any()
         info["violate_limit"] = over_joint_limit
         info["terminate"] = info["terminate"] and (not over_joint_limit)
