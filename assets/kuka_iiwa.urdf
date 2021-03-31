@@ -42,13 +42,13 @@
 <robot name="lbr_iiwa" xmlns:xacro="http://www.ros.org/wiki/xacro">
   <!-- Import Rviz colors -->
   <material name="Grey">
-    <color rgba="0.2 0.2 0.2 1.0"/>
+    <color rgba="0.2 0.2 0.2 0.5"/>
   </material>
   <material name="Orange">
-    <color rgba="1.0 0.423529411765 0.0392156862745 1.0"/>
+    <color rgba="1.0 0.423529411765 0.0392156862745 0.5"/>
   </material>
   <material name="Blue">
-  <color rgba="0.5 0.7 1.0 1.0"/>      
+  <color rgba="0.5 0.7 1.0 0.5"/>      
 </material>
 
   <!--Import the lbr iiwa macro -->

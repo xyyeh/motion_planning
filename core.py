@@ -36,7 +36,7 @@ class Trajectory(object):
         # organize joint space trajectories as q_init^T, [q_1^T; q_2^T; ...; q_nTimestep^T] , q_goal^T
         # [2.96706  2.0944 2.96706  2.0944 2.96706  2.0944 3.05433]
         # [-2.96706  -2.0944 -2.96706  -2.0944 -2.96706  -2.0944 -3.05433]
-        self.start = np.array([0.0, -1.285, 0, -2.356, 0.0, 1.571, 0.785])
+        self.start = np.array([0.0, -1.285, 0, -2.0, 0.0, 1.571, 0.785])
         self.data = np.zeros([self.timesteps, dof])
         self.end = np.array([-0.99, 1.0, -0.61, 1.04, 0.88, 1.21, -1.12])
 
@@ -158,7 +158,6 @@ class Robot(object):
     """
     Robot kinematics and dynamics class
     """
-
     def __init__(self, urdf_path):
         self.urdf_path = urdf_path
         self.kine_dyn = from_urdf_file(self.urdf_path)
@@ -242,6 +241,9 @@ class Robot(object):
 
         return M, Minv, h
 
+    def load_collision_points(self):
+        pass
+
     def _body_id_from_name(name, bodies):
         """
         Gets the body Id from the body name
@@ -312,12 +314,12 @@ def plot_results(trajectory, upper_limit, lower_limit):
         counts = range(len(joint_trajectory))
         plt.plot(counts, joint_trajectory)
         plt.plot(
-            counts, np.max(joint_trajectory) * np.ones(joint_trajectory.shape), "r"
+            counts, upper_limit[i] * np.ones(joint_trajectory.shape), "r"
         )
         plt.plot(
-            counts, np.min(joint_trajectory) * np.ones(joint_trajectory.shape), "r"
+            counts, lower_limit[i] * np.ones(joint_trajectory.shape), "r"
         )
-        print("Joint {}, min = {}, max = {}".format(i, np.min(joint_trajectory), np.max(joint_trajectory)))
+        # print("Joint {}, min = {}, max = {}".format(i, np.min(joint_trajectory), np.max(joint_trajectory)))
     plt.show()
 
 
@@ -331,7 +333,7 @@ if __name__ == "__main__":
     sim = Simulation(step_time, robot)
 
     # configurations
-    cfg.timesteps = 50
+    cfg.timesteps = 30
     cfg.get_global_param(cfg.timesteps)
 
     # get ik

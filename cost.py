@@ -86,6 +86,22 @@ class Cost(object):
         smoothness_grad *= link_smooth_weight
         return smoothness_loss, smoothness_grad
 
+    def forward_kinematics_obstacle(self, xi, start, end, arc_length=True):
+        """
+        Instead of computing C space trajectory and using Jacobian, we differentiate workspace positoins for velocity and acceleration.
+        """
+        pass
+        # robot_pts = robot.collision_points.
+
+    def compute_collision_loss(self, xi, start, end):
+        """
+        Compute obstacle loss
+        """
+        n, m = xi.shape[0], xi.shape[1]
+        obs_grad = np.zeros_like(xi)
+        obs_cost = np.zeros([n, m + 1])
+        # ()
+
     def compute_total_loss(self, trajectory):
         """
         Compute total losses, gradients, and other info
@@ -121,7 +137,7 @@ class Cost(object):
             print("Not implemented - compute_total_loss")
             goal_distance = 0
         else:
-            goal_distance = np.linalg.norm(trajectory.data[-1] - trajectory.end)
+            goal_distance = 0
 
         # goal_distance = (
         #     np.linalg.norm(
@@ -131,9 +147,11 @@ class Cost(object):
         #     else 0
         # )
 
+        # print(goal_distance)
         terminate = (
             self.cfg.pre_terminate
             and (goal_distance < 0.01)
+            and smoothness_loss_sum < self.cfg.terminate_smooth_loss
         )
 
         info = {
