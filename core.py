@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 
 torch.no_grad()
 
+
 class Trajectory(object):
     """
     Trajectory class
@@ -64,10 +65,7 @@ class Trajectory(object):
         if cfg.dynamic_timestep:
             timesteps = min(
                 max(
-                    int(
-                        np.linalg.norm(self.start - self.end)
-                        / cfg.trajectory_delta
-                    ),
+                    int(np.linalg.norm(self.start - self.end) / cfg.trajectory_delta),
                     cfg.trajectory_min_step,
                 ),
                 cfg.trajectory_max_step,
@@ -81,6 +79,7 @@ class Trajectory(object):
         self.data = interpolate_waypoints(
             np.stack([self.start, self.end]), timesteps, self.start.shape[0], mode=mode
         )
+
 
 class Simulation(object):
     def __init__(self, time_step, robot):
@@ -144,13 +143,16 @@ class Simulation(object):
         self.robot.update_kinematics(q, dq)
         self.robot.update_dynamics()
 
+
 class Environment(object):
     """
     Environment class storing robot and other objects.
     """
+
     def __init__(self, robot, cfg):
         self.robot = robot
         self.config = cfg
+
 
 class Robot(object):
     """
@@ -270,10 +272,12 @@ class Robot(object):
 
         return m4d
 
+
 class PlanningScene(object):
     """
     Planning scene containing the environment configuration, planner and trajectory.
     """
+
     def __init__(self, robot, cfg):
         self.trajectory = Trajectory(cfg.timesteps)
         self.env = Environment(robot, cfg)
@@ -295,14 +299,25 @@ class PlanningScene(object):
         plan = self.planner.plan(self.trajectory)
         return plan
 
+
 def plot_results(trajectory, upper_limit, lower_limit):
     """
     Plots the joint space trajectories
     """
     for i in range(robot.dof):
-        plt.subplot(4,3,i+1)
-        plt.plot(np.append(np.append(trajectory.start[i], trajectory.data[:,i]),trajectory.end[i]))
-
+        plt.subplot(4, 3, i + 1)
+        joint_trajectory = np.append(
+            np.append(trajectory.start[i], trajectory.data[:, i]), trajectory.end[i]
+        )
+        counts = range(len(joint_trajectory))
+        plt.plot(counts, joint_trajectory)
+        plt.plot(
+            counts, np.max(joint_trajectory) * np.ones(joint_trajectory.shape), "r"
+        )
+        plt.plot(
+            counts, np.min(joint_trajectory) * np.ones(joint_trajectory.shape), "r"
+        )
+        print("Joint {}, min = {}, max = {}".format(i, np.min(joint_trajectory), np.max(joint_trajectory)))
     plt.show()
 
 
@@ -333,9 +348,9 @@ if __name__ == "__main__":
     # # run controller
     # # while sim.get_time() < total_time:
     # #     # sim.step_simulation()
-    
+
     i = 0
     while i < cfg.timesteps:
-        sim.step_simulation(planningScene.trajectory.data[i,:])
-        i = i+1
+        sim.step_simulation(planningScene.trajectory.data[i, :])
+        i = i + 1
         time.sleep(0.05)

@@ -109,8 +109,6 @@ class Optimizer(object):
         """
         Run one step of chomp optimization, using update rule in (19) (after solving the arg min) of DOI 10.1177/0278364913488805
         """
-        print("Run chomp")
-
         # update time, weights and step size
         self.update()
         curve = trajectory.data
