@@ -124,10 +124,21 @@ class Simulation(object):
         self.time += self.time_step
         time.sleep(self.time_step)
 
-    def step_simulation(self, q):
+    def step_simulation(self, q, show_collision_points=False):
         self._set_robot_cfg(q)
         self.time += self.time_step
         time.sleep(self.time_step)
+
+    def add_debug_lines(self):
+        for i in range(self.robot.dof):
+            ls = b.getLinkState(self.robot.get_id(), i)
+            length = 0.5
+            origin = np.array(ls[4])
+            R = np.array(b.getMatrixFromQuaternion(ls[5])).reshape((3, 3))
+            x = origin + length*R[:,0]
+            z = origin + length*R[:,2]         
+            b.addUserDebugLine(lineFromXYZ=origin, lineToXYZ=x, lineColorRGB=np.array([1,0,0]))
+            b.addUserDebugLine(lineFromXYZ=origin, lineToXYZ=z, lineColorRGB=np.array([0,0,1]))
 
     def _set_robot_cfg(self, q):
         for i in range(b.getNumJoints(self.robot.id)):
@@ -158,10 +169,12 @@ class Robot(object):
     """
     Robot kinematics and dynamics class
     """
+
     def __init__(self, urdf_path):
         self.urdf_path = urdf_path
         self.kine_dyn = from_urdf_file(self.urdf_path)
         self.id = -1
+        self.collision_points = []
         print(
             "Imported from "
             + self.urdf_path
@@ -241,8 +254,21 @@ class Robot(object):
 
         return M, Minv, h
 
-    def load_collision_points(self):
-        pass
+    def set_collision_points(self, file_path=""):
+        """
+        Sets collision points on the robot from a file or use hard coded values
+        """
+        if len(file_path) == 0:
+            print("Not loading from file")
+            self.collision_points.append([0, 0, 0])
+            self.collision_points.append([0, 0, 0])
+            self.collision_points.append([0, 0, 0])
+            self.collision_points.append([0, 0, 0])
+            self.collision_points.append([0, 0, 0])
+            self.collision_points.append([0, 0, 0])
+            self.collision_points.append([0, 0, 0])
+        else:
+            print("Loading from file")
 
     def _body_id_from_name(name, bodies):
         """
@@ -313,13 +339,8 @@ def plot_results(trajectory, upper_limit, lower_limit):
         )
         counts = range(len(joint_trajectory))
         plt.plot(counts, joint_trajectory)
-        plt.plot(
-            counts, upper_limit[i] * np.ones(joint_trajectory.shape), "r"
-        )
-        plt.plot(
-            counts, lower_limit[i] * np.ones(joint_trajectory.shape), "r"
-        )
-        # print("Joint {}, min = {}, max = {}".format(i, np.min(joint_trajectory), np.max(joint_trajectory)))
+        plt.plot(counts, upper_limit[i] * np.ones(joint_trajectory.shape), "r")
+        plt.plot(counts, lower_limit[i] * np.ones(joint_trajectory.shape), "r")
     plt.show()
 
 
@@ -342,6 +363,8 @@ if __name__ == "__main__":
     planningScene = PlanningScene(robot, cfg)
     planningScene.plan()
 
+    sim.add_debug_lines()
+
     # load objects
 
     # results
@@ -353,6 +376,7 @@ if __name__ == "__main__":
 
     i = 0
     while i < cfg.timesteps:
-        sim.step_simulation(planningScene.trajectory.data[i, :])
+        # sim.step_simulation(planningScene.trajectory.data[i, :])
+        sim.step_simulation(np.zeros(7), show_collision_points=True)
         i = i + 1
         time.sleep(0.05)

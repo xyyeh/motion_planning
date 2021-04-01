@@ -90,7 +90,7 @@ class Planner(object):
                     self.learner.update_goal()
                     self.selected_goals.append(self.trajectory.goal_idx)
 
-                self.info.append(self.optim.optimize(trajectory, force_update=True))  
+                self.info.append(self.optim.optimize(trajectory, force_update=True))
                 self.history_trajectories.append(np.copy(trajectory.data))
 
                 if self.cfg.report_time:
