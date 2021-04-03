@@ -259,14 +259,8 @@ class Robot(object):
         Sets collision points on the robot from a file or use hard coded values
         """
         if len(file_path) == 0:
-            print("Not loading from file")
-            self.collision_points.append([0, 0, 0])
-            self.collision_points.append([0, 0, 0])
-            self.collision_points.append([0, 0, 0])
-            self.collision_points.append([0, 0, 0])
-            self.collision_points.append([0, 0, 0])
-            self.collision_points.append([0, 0, 0])
-            self.collision_points.append([0, 0, 0])
+            print("Not loading from file, we will use offsets from origins of all frames")
+            # self.collision_points.append([0])
         else:
             print("Loading from file")
 

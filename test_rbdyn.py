@@ -81,8 +81,8 @@ class Robot(object):
         ]
 
         # forward kinematics
-        rbd.forwardKinematics(p.mb, p.mbc)
-        rbd.forwardVelocity(p.mb, p.mbc)
+        rbd.forwardKinematics(self.kine_dyn.mb, self.kine_dyn.mbc)
+        rbd.forwardVelocity(self.kine_dyn.mb, self.kine_dyn.mbc)
 
     def update_dynamics(self):
         """
@@ -90,12 +90,12 @@ class Robot(object):
         @return M, Minv and h
         """
         # mass matrix
-        fd = rbd.ForwardDynamics(p.mb)
-        fd.computeH(p.mb, p.mbc)
+        fd = rbd.ForwardDynamics(self.kine_dyn.mb)
+        fd.computeH(self.kine_dyn.mb, self.kine_dyn.mbc)
         self.M = fd.H()
         self.Minv = self.M.inverse()
         # nonlinear effects vector
-        fd.computeC(p.mb, p.mbc)
+        fd.computeC(self.kine_dyn.mb, self.kine_dyn.mbc)
         self.h = fd.C()
 
         return M, Minv, h
@@ -203,7 +203,13 @@ if __name__ == "__main__":
     robot = Robot("./assets/kuka_iiwa.urdf")
     sim = Simulation(step_time, robot)
 
+   
     q = np.random.rand(7)
+    dq = np.random.rand(7)
+    
+    robot.update_kinematics(q, dq)
+    sv = (robot.kine_dyn.mbc.bodyPosW[1])
+    print(sv.translation())
 
     while sim.get_time() < total_time:
         # sim.step_simulation()
