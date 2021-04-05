@@ -135,10 +135,14 @@ class Simulation(object):
             length = 0.5
             origin = np.array(ls[4])
             R = np.array(b.getMatrixFromQuaternion(ls[5])).reshape((3, 3))
-            x = origin + length*R[:,0]
-            z = origin + length*R[:,2]         
-            b.addUserDebugLine(lineFromXYZ=origin, lineToXYZ=x, lineColorRGB=np.array([1,0,0]))
-            b.addUserDebugLine(lineFromXYZ=origin, lineToXYZ=z, lineColorRGB=np.array([0,0,1]))
+            x = origin + length * R[:, 0]
+            z = origin + length * R[:, 2]
+            b.addUserDebugLine(
+                lineFromXYZ=origin, lineToXYZ=x, lineColorRGB=np.array([1, 0, 0])
+            )
+            b.addUserDebugLine(
+                lineFromXYZ=origin, lineToXYZ=z, lineColorRGB=np.array([0, 0, 1])
+            )
 
     def _set_robot_cfg(self, q):
         for i in range(b.getNumJoints(self.robot.id)):
@@ -196,6 +200,9 @@ class Robot(object):
         for i, (k, v) in enumerate(self.kine_dyn.limits.upper.items()):
             self.upper_limit[i] = v
 
+        # set collision points
+        self.set_collision_points()
+
     def set_id(self, id):
         """
         Sets the robot id
@@ -208,11 +215,10 @@ class Robot(object):
         """
         return self.id
 
-    def update_kinematics(self, q, dq):
+    def update_poses(self, q):
         """
         Update kinematics using values from physics engine
         @param q A list of joint angles
-        @param dq A list of joint velocities
         """
         self.kine_dyn.mbc.q = [
             [],
@@ -224,6 +230,14 @@ class Robot(object):
             [q[5]],
             [q[6]],
         ]
+        rbd.forwardKinematics(self.kine_dyn.mb, self.kine_dyn.mbc)
+
+    def update_kinematics(self, q, dq):
+        """
+        Update kinematics using values from physics engine
+        @param q A list of joint angles
+        @param dq A list of joint velocities
+        """
         self.kine_dyn.mbc.alpha = [
             [],
             [dq[0]],
@@ -234,9 +248,8 @@ class Robot(object):
             [dq[5]],
             [dq[6]],
         ]
-        # forward kinematics
-        rbd.forwardKinematics(p.mb, p.mbc)
-        rbd.forwardVelocity(p.mb, p.mbc)
+        self.update_poses(q)
+        rbd.forwardVelocity(self.kine_dyn.mb, self.kine_dyn.mbc)
 
     def update_dynamics(self):
         """
@@ -244,12 +257,12 @@ class Robot(object):
         @return M, Minv and h
         """
         # mass matrix
-        fd = rbd.ForwardDynamics(p.mb)
-        fd.computeH(p.mb, p.mbc)
+        fd = rbd.ForwardDynamics(self.kine_dyn.mb)
+        fd.computeH(self.kine_dyn.mb, self.kine_dyn.mbc)
         self.M = fd.H()
         self.Minv = self.M.inverse()
         # nonlinear effects vector
-        fd.computeC(p.mb, p.mbc)
+        fd.computeC(self.kine_dyn.mb, self.kine_dyn.mbc)
         self.h = fd.C()
 
         return M, Minv, h
@@ -258,11 +271,27 @@ class Robot(object):
         """
         Sets collision points on the robot from a file or use hard coded values
         """
+
+        # default points
+        points = np.zeros([self.dof, 1, 3])  # n_dofs, 1 point, xyz coordinates
         if len(file_path) == 0:
-            print("Not loading from file, we will use offsets from origins of all frames")
-            # self.collision_points.append([0])
+            print(
+                "Not loading from file, we will use origins of all link frames, so number of points per body is 1"
+            )
         else:
-            print("Loading from file")
+            print(
+                "Loading from file, points are with respect to link frames. Points will be subsampled to {}".format(
+                    self.collision_point_num
+                )
+            )
+
+        self.collision_points = np.array(points)
+        print(
+            "The shape of collision points is ----------------------- {}".format(
+                self.collision_points.shape
+            )
+        )
+        print("Size of collision points is {}".format(self.collision_points.shape))
 
     def _body_id_from_name(name, bodies):
         """

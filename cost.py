@@ -88,10 +88,31 @@ class Cost(object):
 
     def forward_kinematics_obstacle(self, xi, start, end, arc_length=True):
         """
-        Instead of computing C space trajectory and using Jacobian, we differentiate workspace positoins for velocity and acceleration.
+        Instead of computing C space trajectory and using Jacobian, we differentiate workspace positions for velocity and acceleration.
         """
-        pass
-        # robot_pts = robot.collision_points.
+        robot_pts = self.env.robot.collision_points  # n_dof x n_points x 3
+
+        n, m = xi.shape[0], xi.shape[1]  # n = n_waypoints, m = n_dof
+        p = robot_pts.shape[1]  # n_points for a particular links
+
+        robot_pts_pos = np.zeros([n, m, p, 3])
+        robot_pts_vel = np.zeros_like(robot_pts_pos)
+        robot_pts_acc = np.zeros_like(robot_pts_pos)
+
+        robot_poses = []
+        for waypoints_idx in range(n):
+            # update kinematics based on current set of way points
+            self.env.robot.update_poses(xi[waypoints_idx, :])
+
+            # update the obstacle's positions
+            for bodies_idx in range(m):
+                # get position from 1st link onwards
+                pos = np.array(
+                    self.env.robot.kine_dyn.mbc.bodyPosW[bodies_idx + 1].translation()
+                )
+                robot_pts_pos[waypoints_idx, bodies_idx, 0, :] = np.reshape(pos, (3,))
+
+        print(robot_pts_pos[0, 2, 0, :])
 
     def compute_collision_loss(self, xi, start, end):
         """
@@ -100,7 +121,12 @@ class Cost(object):
         n, m = xi.shape[0], xi.shape[1]
         obs_grad = np.zeros_like(xi)
         obs_cost = np.zeros([n, m + 1])
-        # ()
+
+        self.forward_kinematics_obstacle(xi, start, end)
+
+        print("compute collision loss .............................")
+
+        return obs_cost, obs_grad
 
     def compute_total_loss(self, trajectory):
         """
@@ -114,6 +140,9 @@ class Cost(object):
         smoothness_loss_sum = smoothness_loss.sum()
 
         # obstacle loss and gradient
+        (obstacle_loss, obstacle_grad) = self.compute_collision_loss(
+            trajectory.data, trajectory.start, trajectory.end
+        )
 
         # total cost and vectorial summation of gradient
         # cost = weighted_obs + weighted_smooth

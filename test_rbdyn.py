@@ -203,13 +203,35 @@ if __name__ == "__main__":
     robot = Robot("./assets/kuka_iiwa.urdf")
     sim = Simulation(step_time, robot)
 
-   
     q = np.random.rand(7)
     dq = np.random.rand(7)
-    
+
     robot.update_kinematics(q, dq)
-    sv = (robot.kine_dyn.mbc.bodyPosW[1])
-    print(sv.translation())
+    sv = robot.kine_dyn.mbc.bodyPosW[1]
+    # print(sv.translation())
+    # print(sv.rotation().transpose())
+
+    test = np.array(sv.translation())
+    test_ = np.reshape(test, (3,))
+    print(test)
+    print(test_)
+
+    c = np.zeros([1,2,3,3])
+    print(c[0,1,2,:])
+    c[0,1,2,:] = test_
+    print(c[0,1,2,:])
+
+    for bi, bd in enumerate(robot.kine_dyn.mb.bodies()):
+        print('body index: {}, body name = {}, body position = {}'.format(bi, bd.name().decode("utf-8"), robot.kine_dyn.mbc.bodyPosW[bi].translation().transpose()))
+
+    # p = e.Vector3d.UnitX()
+    # p_ = sv.rotation().transpose() * p + sv.translation()
+    # print(p_)
+
+    # example to add in a cube
+    link1_id = b.loadURDF("./assets/cube.urdf")
+    b.setCollisionFilterGroupMask(link1_id, -1, 0, 0)
+    # b.resetBasePositionAndOrientation(position=)
 
     while sim.get_time() < total_time:
         # sim.step_simulation()
