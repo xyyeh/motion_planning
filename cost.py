@@ -91,6 +91,7 @@ class Cost(object):
         Instead of computing C space trajectory and using Jacobian, we differentiate workspace positions for velocity and acceleration.
         """
         robot_pts = self.env.robot.collision_points  # n_dof x n_points x 3
+        obstacle_pts = self.env.obstacle_points # n_obs_points x 3
 
         n, m = xi.shape[0], xi.shape[1]  # n = n_waypoints, m = n_dof
         p = robot_pts.shape[1]  # n_points for a particular links
@@ -99,7 +100,7 @@ class Cost(object):
         robot_pts_vel = np.zeros_like(robot_pts_pos)
         robot_pts_acc = np.zeros_like(robot_pts_pos)
 
-        robot_poses = []
+        # get the position, velocity and acceleration for each collision point using finite differencing
         for waypoints_idx in range(n):
             # update kinematics based on current set of way points
             self.env.robot.update_poses(xi[waypoints_idx, :])
@@ -112,7 +113,41 @@ class Cost(object):
                 )
                 robot_pts_pos[waypoints_idx, bodies_idx, 0, :] = np.reshape(pos, (3,))
 
+            # calculate potentials and gradients based on position of points
+            potentials, potential_grads, collide = self.compute_obstacle_cost_and_gradient(robot_pts_pos, obstacle_pts)
+
+            
+
         print(robot_pts_pos[0, 2, 0, :])
+
+    def compute_obstacle_cost_and_gradient(self, robot_pts, obstacle_points, radius, clearance):
+        """
+        compute obstacle cost and gradient using (4) and Fig. 2 and Fig. 6 from 10.1177/0278364913488805
+        """
+        obstacle_points = self.env.obstacle_points # n_points x 3
+        n_obstacle = obstacle_points.shape[0]
+        n_dof = robot_pts.shape[0]
+        n_collision_points = robot_pts.shape[1]
+        
+        # run through all obstacles and compute the potentials
+        cost = np.zeros([n_dof, n_obstacles])
+        for j in range(n_dof):
+            for i in range(n_obstacle):
+                # for k in range(n_collision_points):
+                #     field_distance = np.norm(obstacle_points[i,:]-robot_pts[j,k,:]) - radius
+                field_distance = np.norm(obstacle_points[i,:]-robot_pts[j,0,:]) # single point
+                D = field_distance - radius # D(x)
+
+                if (D >= epsilon):
+                    c = 0
+                elif (D >= 0):
+                    c = 1/2 * (D - epsilon)**2 / epsilon
+                else:
+                    c = -D + 1/2*epsilon
+                
+                cost[j,i] = c
+                
+
 
     def compute_collision_loss(self, xi, start, end):
         """

@@ -164,9 +164,23 @@ class Environment(object):
     Environment class storing robot and other objects.
     """
 
-    def __init__(self, robot, cfg):
+    def __init__(self, robot, cfg, obstacle_points_path=""):
         self.robot = robot
         self.config = cfg
+        self.obstacle_points = []
+
+        self.set_obstacle_points(obstacle_points_path)
+
+    def set_obstacle_points(self, file_path=""):
+        # obstacles, defaulted to 1 obstacle
+        obstacles = np.zeros([1, 3])
+        obstacles[0] = np.array([1, 1, 1])
+        self.obstacle_points = np.array(obstacles)
+        print(
+            "The shape of obstacle points is ----------------------- {}".format(
+                self.obstacle_points.shape
+            )
+        )
 
 
 class Robot(object):
@@ -174,7 +188,7 @@ class Robot(object):
     Robot kinematics and dynamics class
     """
 
-    def __init__(self, urdf_path):
+    def __init__(self, urdf_path, collision_points_path=""):
         self.urdf_path = urdf_path
         self.kine_dyn = from_urdf_file(self.urdf_path)
         self.id = -1
@@ -201,7 +215,7 @@ class Robot(object):
             self.upper_limit[i] = v
 
         # set collision points
-        self.set_collision_points()
+        self.set_collision_points(collision_points_path)
 
     def set_id(self, id):
         """
@@ -272,7 +286,7 @@ class Robot(object):
         Sets collision points on the robot from a file or use hard coded values
         """
 
-        # default points
+        # robot collision points
         points = np.zeros([self.dof, 1, 3])  # n_dofs, 1 point, xyz coordinates
         if len(file_path) == 0:
             print(
@@ -291,7 +305,6 @@ class Robot(object):
                 self.collision_points.shape
             )
         )
-        print("Size of collision points is {}".format(self.collision_points.shape))
 
     def _body_id_from_name(name, bodies):
         """
